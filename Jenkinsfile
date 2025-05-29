@@ -11,6 +11,7 @@ pipeline {
         stage('Build & Inject Env') {
             steps {
                 withCredentials([string(credentialsId: 'OPENWEATHER_API_KEY', variable: 'API_KEY')]) {
+                    // Generate .env for backend
                     sh '''
                       cat > backend/.env <<EOF
                       API_KEY=${API_KEY}
@@ -18,26 +19,26 @@ pipeline {
                       NODE_ENV=production
                       EOF
                     '''
-                    docker.image('docker.io/docker:stable-dind').inside('--privileged') {
-                        sh 'docker build -t weather-backend:latest ./backend'
-                        sh """
-                          docker build \
-                            --build-arg REACT_APP_BACKEND_URL=http://192.168.1.13:3001 \
-                            -t weather-frontend:latest \
-                            ./frontend
-                        """
-                    }
+                    // Build backend image
+                    sh 'docker build -t weather-backend:latest ./backend'
+                    // Build frontend image with baked-in backend URL
+                    sh """
+                      docker build \
+                        --build-arg REACT_APP_BACKEND_URL=http://192.168.1.13:3001 \
+                        -t weather-frontend:latest \
+                        ./frontend
+                    """
                 }
             }
         }
 
         stage('Deploy') {
             steps {
-                // Ensure we're in the right directory
+                // Ensure we're in the dir with docker-compose.yml
                 dir("${WORKSPACE}") {
-                    // Clean up any old containers (and their volumes), remove orphans
+                    // Tear down any old containers (and remove orphaned ones & volumes)
                     sh 'docker compose down --remove-orphans --volumes'
-                    // Build and start fresh in detached mode
+                    // Build & start fresh
                     sh 'docker compose up -d --build'
                 }
             }
