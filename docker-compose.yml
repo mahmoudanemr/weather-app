@@ -1,18 +1,40 @@
 services:
+
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
   backend:
     build: ./backend
+    container_name: weather-backend
     ports:
       - "3001:3001"
     env_file:
       - ./backend/.env
+    depends_on:
+      - jenkins
 
   frontend:
     build:
       context: ./frontend
       args:
         REACT_APP_BACKEND_URL: http://192.168.1.13:3001
+    container_name: weather-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
+
+volumes:
+  jenkins_home:
 

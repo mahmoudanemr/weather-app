@@ -1,0 +1,5 @@
+configuration-as-code:latest
+git:latest
+docker-workflow:latest
+workflow-aggregator:latest
+credentials-binding:latest
