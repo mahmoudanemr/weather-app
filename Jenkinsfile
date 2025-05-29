@@ -2,14 +2,12 @@ pipeline {
     agent any
 
     environment {
-        // Adjust this if your branch is named differently
         GIT_BRANCH = 'main'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Pull the latest from your GitHub repo
                 checkout([$class: 'GitSCM',
                     branches: [[name: "*/${GIT_BRANCH}"]],
                     userRemoteConfigs: [[url: 'https://github.com/mahmoudanemr/weather-app.git']]
@@ -19,9 +17,8 @@ pipeline {
 
         stage('Build & Inject Env') {
             steps {
-                // Inject your OpenWeather API key securely
                 withCredentials([string(credentialsId: 'OPENWEATHER_API_KEY', variable: 'API_KEY')]) {
-                    // Create a .env for the backend
+                    // Create the backend .env inside the workspace
                     sh '''
                       cat > backend/.env <<EOF
                       API_KEY=${API_KEY}
@@ -29,12 +26,11 @@ pipeline {
                       NODE_ENV=production
                       EOF
                     '''
-                    // Build the backend image
+                    // Build the backend and frontend images
                     sh 'docker build -t weather-backend:latest ./backend'
-                    // Build the frontend image, passing in the backend URL
                     sh """
                       docker build \
-                        --build-arg REACT_APP_BACKEND_URL=http://192.168.1.13:3001 \
+                        --build-arg REACT_APP_BACKEND_URL=http://backend:3001 \
                         -t weather-frontend:latest \
                         ./frontend
                     """
@@ -42,14 +38,13 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy App Only') {
             steps {
-                // Ensure commands run from the directory with docker-compose.yml
                 dir("${WORKSPACE}") {
-                    // Tear down any existing containers, remove orphans and volumes
-                    sh 'docker compose down --remove-orphans --volumes'
-                    // Rebuild and start all services in detached mode
-                    sh 'docker compose up -d --build'
+                    // Tear down just the app services (backend+frontend)
+                    sh 'docker compose --profile app down --remove-orphans'
+                    // Bring them up fresh
+                    sh 'docker compose --profile app up -d --build backend frontend'
                 }
             }
         }

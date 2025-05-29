@@ -4,36 +4,38 @@ services:
     build:
       context: ./jenkins
       dockerfile: Dockerfile
-    container_name: jenkins
-    user: root
     ports:
       - "8080:8080"
       - "50000:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
+    # so you don’t accidentally tear down CI when you deploy your app:
+    profiles: 
+      - ci
 
   backend:
     build: ./backend
-    container_name: weather-backend
     ports:
       - "3001:3001"
     env_file:
       - ./backend/.env
     depends_on:
-      - jenkins
+      - jenkins       # ensures Jenkins is up first
+    profiles:
+      - app
 
   frontend:
     build:
       context: ./frontend
       args:
-        REACT_APP_BACKEND_URL: http://192.168.1.13:3001
-    container_name: weather-frontend
+        REACT_APP_BACKEND_URL: http://backend:3001
     ports:
       - "3000:80"
     depends_on:
       - backend
+    profiles:
+      - app
 
 volumes:
   jenkins_home:
